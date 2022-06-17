@@ -190,40 +190,57 @@ async function keySee() {
 }
 
 async function getCert(keys: RsaKeyPair, keysCE: RsaPublicKey ): Promise <void> {
-  console.clear();
-  const intent = (await keys).publicKey.toJsonString();
-  const j = sha.digest(intent);
-  console.log("Resumen digest: " +await j);
-  const msgBI = bic.base64ToBigint(await j);
-  const r = bcu.randBetween((await keys).publicKey.n - 1n)
-  const blindMsg = msgBI * bcu.modPow(r, (await keysCE).e, (await keysCE).n);
-  const blindMsgB64 = bic.bigintToBase64(blindMsg);
-  const response = await fetch("http://localhost:8080/rsa/sign", {
-    method: 'POST',
-    body: JSON.stringify({
-      message: blindMsgB64,
-    }),
-    headers: {'Content-Type': 'application/json',
-  } 
-  });
-  const data = await response.json();
-  const parsedData = await (JSON.parse(JSON.stringify(data)));
-  console.log ("La data devuelta del servidor es: " +await parsedData.message);
-  const s = bic.base64ToBigint(await parsedData.message) *bcu.modInv(r, (await keysCE).n);
-  const v = (await keysCE).verify(s);
-  console.log("Después de descegar, obtengo esto al verificar la firma: "+bic.bigintToBase64(v));
-  cert = bic.bigintToBase64(s);
-  hascert = true;
-  const answers = await inquirer.prompt({
-    type: "list",
-    name: "command",
-    message: "Elige una opción",
-    choices: Object.values(Commands2)
-  });
-  switch (answers["command"]) {
-    case Commands2.Back:
-      promptUser();
-      break;
+  if (access == true) {
+    console.clear();
+    const intent = (await keys).publicKey.toJsonString();
+    const j = sha.digest(intent);
+    console.log("Resumen digest: " +await j);
+    const msgBI = bic.base64ToBigint(await j);
+    const r = bcu.randBetween((await keys).publicKey.n - 1n)
+    const blindMsg = msgBI * bcu.modPow(r, (await keysCE).e, (await keysCE).n);
+    const blindMsgB64 = bic.bigintToBase64(blindMsg);
+    const response = await fetch("http://localhost:8080/rsa/sign", {
+      method: 'POST',
+      body: JSON.stringify({
+        message: blindMsgB64,
+      }),
+      headers: {'Content-Type': 'application/json',
+    } 
+    });
+    const data = await response.json();
+    const parsedData = await (JSON.parse(JSON.stringify(data)));
+    console.log ("La data devuelta del servidor es: " +await parsedData.message);
+    const s = bic.base64ToBigint(await parsedData.message) *bcu.modInv(r, (await keysCE).n);
+    const v = (await keysCE).verify(s);
+    console.log("Después de descegar, obtengo esto al verificar la firma: "+bic.bigintToBase64(v));
+    cert = bic.bigintToBase64(s);
+    hascert = true;
+    const answers = await inquirer.prompt({
+      type: "list",
+      name: "command",
+      message: "Elige una opción",
+      choices: Object.values(Commands2)
+    });
+    switch (answers["command"]) {
+      case Commands2.Back:
+        promptUser();
+        break;
+    }
+  }
+  else {
+    console.clear();
+    console.log("No puedes solicitar claves sin antes iniciar sesión");
+    const answers = await inquirer.prompt({
+      type: "list",
+      name: "command",
+      message: "Elige una opción",
+      choices: Object.values(Commands2)
+    });
+    switch (answers["command"]) {
+      case Commands2.Back:
+        promptUser();
+        break;
+    }
   }
 }
 
