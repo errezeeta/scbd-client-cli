@@ -15,27 +15,34 @@ var response;
 var responseSer;
 var keysCE: RsaPublicKey;
 var cert: String;
+var voted: boolean = false;
+var access : boolean = false;
+var hascert: boolean = false;
 
 let collection: TaskCollection = new JsonTaskCollection("Fazt", tasks);
 let showCompleted = true;
 
 async function displayTaskList(): Promise<void> {
-  console.log(
-    `Proyecto SCBD Grupo 4\n`+
-    "Bienvenido "+username+"!"
-  );
+  if (access == true) {
+    console.log(
+      `Proyecto SCBD Grupo 4\n`+
+      "Bienvenido "+username+"!"
+    );
+  }
+  else {
+    console.log(
+      `Proyecto SCBD Grupo 4`
+    );
+  }
 }
 
 enum Commands {
   Login = "Iniciar sesion",
-  Complete = "Complete Task",
-  Toggle = "Show/Hide Completed",
-  Purge = "Remove Complete Tasks",
-  Quit = "Quit",
   KeySee = "Ver mi clave",
   CEKeySee = "Ver clave pública de la CE",
   GetCert = "Solicitar certificado",
-  Vote = "Votar"
+  Vote = "Votar",
+  Quit = "Quit",
 }
 
 enum Commands2 {
@@ -101,6 +108,21 @@ async function sendServer() {
       const parsedKeys = await (JSON.parse(JSON.stringify(res)));
       keysCE = new RsaPublicKey(bic.base64ToBigint(parsedKeys.e), bic.base64ToBigint(parsedKeys.n));
       console.log("MIS keys: "+ keysCE.toJsonString());
+      access = true;
+    }
+    else {
+      console.log("Error al iniciar sesión, porfavor, vuelve a intentarlo");
+      const answers = await inquirer.prompt({
+        type: "list",
+        name: "command",
+        message: " ",
+        choices: Object.values(Commands2)
+      });
+      switch (answers["command"]) {
+        case Commands2.Back:
+          promptUser();
+          break;
+      }
     }
     promptUser();
 }
@@ -135,18 +157,35 @@ async function keyGen() {
 }
 
 async function keySee() {
-  console.clear();
-  console.log("Tu clave publica és: "+(await keys).publicKey.toJsonString());
-  const answers = await inquirer.prompt({
-    type: "list",
-    name: "command",
-    message: "Elige una opción",
-    choices: Object.values(Commands2)
-  });
-  switch (answers["command"]) {
-    case Commands2.Back:
-      promptUser();
-      break;
+  if (keys != undefined) {
+    console.clear();
+    console.log("Tu clave publica és: "+(await keys).publicKey.toJsonString());
+    const answers = await inquirer.prompt({
+      type: "list",
+      name: "command",
+      message: "Elige una opción",
+      choices: Object.values(Commands2)
+    });
+    switch (answers["command"]) {
+      case Commands2.Back:
+        promptUser();
+        break;
+    }
+  }
+  else {
+    console.clear();
+    console.log("Aún no dispones de claves");
+    const answers = await inquirer.prompt({
+      type: "list",
+      name: "command",
+      message: "Elige una opción",
+      choices: Object.values(Commands2)
+    });
+    switch (answers["command"]) {
+      case Commands2.Back:
+        promptUser();
+        break;
+    }
   }
 }
 
@@ -174,6 +213,7 @@ async function getCert(keys: RsaKeyPair, keysCE: RsaPublicKey ): Promise <void> 
   const v = (await keysCE).verify(s);
   console.log("Después de descegar, obtengo esto al verificar la firma: "+bic.bigintToBase64(v));
   cert = bic.bigintToBase64(s);
+  hascert = true;
   const answers = await inquirer.prompt({
     type: "list",
     name: "command",
@@ -188,18 +228,35 @@ async function getCert(keys: RsaKeyPair, keysCE: RsaPublicKey ): Promise <void> 
 }
 
 async function cekeySee() {
-  console.clear();
-  console.log("La clave pública del CE és: "+keysCE.toJsonString());
-  const answers = await inquirer.prompt({
-    type: "list",
-    name: "command",
-    message: "Elige una opción",
-    choices: Object.values(Commands2)
-  });
-  switch (answers["command"]) {
-    case Commands2.Back:
-      promptUser();
-      break;
+  if (keysCE != undefined) {
+    console.clear();
+    console.log("La clave pública del CE és: "+keysCE.toJsonString());
+    const answers = await inquirer.prompt({
+      type: "list",
+      name: "command",
+      message: "Elige una opción",
+      choices: Object.values(Commands2)
+    });
+    switch (answers["command"]) {
+      case Commands2.Back:
+        promptUser();
+        break;
+    }
+  }
+  else {
+    console.clear();
+    console.log("Aún no dispones de la clave del CE");
+    const answers = await inquirer.prompt({
+      type: "list",
+      name: "command",
+      message: "Elige una opción",
+      choices: Object.values(Commands2)
+    });
+    switch (answers["command"]) {
+      case Commands2.Back:
+        promptUser();
+        break;
+    }
   }
 }
 
@@ -237,6 +294,7 @@ async function sendVote(keys: RsaKeyPair, keysCE: RsaPublicKey, vote: string, pu
     });
   const finaldata = await secondRes.json();
   const parsedfinal = await (JSON.parse(JSON.stringify(await finaldata)));
+  voted = true;
   console.log( JSON.stringify(parsedfinal));
   const answers = await inquirer.prompt({
     type: "list",
@@ -252,25 +310,70 @@ async function sendVote(keys: RsaKeyPair, keysCE: RsaPublicKey, vote: string, pu
 }
 
 async function pickVote(): Promise<void> {
-  console.clear();
-  const answers = await inquirer.prompt({
-    type: "list",
-    name: "command",
-    message: "Mark Task Complete",
-    choices: Object.values(Votacion)
-    });
-    switch (answers["command"]) {
-      case Votacion.Laporta:
-        sendVote(await keys, keysCE, "00010000", cert);
-        break;
-      case Votacion.Bartomeu:
-        sendVote(await keys, keysCE, "00000001", cert);
-        break;
-      case Votacion.Back:
-        promptUser();
-        break;
+  if (voted == false && access == true) {
+    if (hascert == true) {
+      console.clear();
+      const answers = await inquirer.prompt({
+        type: "list",
+        name: "command",
+        message: "Mark Task Complete",
+        choices: Object.values(Votacion)
+        });
+        switch (answers["command"]) {
+          case Votacion.Laporta:
+            sendVote(await keys, keysCE, "00010000", cert);
+            break;
+          case Votacion.Bartomeu:
+            sendVote(await keys, keysCE, "00000001", cert);
+            break;
+          case Votacion.Back:
+            promptUser();
+            break;
+        }
+      }
+      else {
+        const answers = await inquirer.prompt({
+          type: "list",
+          name: "command",
+          message: "Aún no dispones de la clave del CE",
+          choices: Object.values(Commands2)
+        });
+        switch (answers["command"]) {
+          case Commands2.Back:
+            promptUser();
+            break;
+        }
+      }
     }
-  };
+    else {
+      if (voted == true) {
+        const answers = await inquirer.prompt({
+          type: "list",
+          name: "command",
+          message: "Un usuario solo puede votar una vez!",
+          choices: Object.values(Commands2)
+        });
+        switch (answers["command"]) {
+          case Commands2.Back:
+            promptUser();
+            break;
+        }
+      }
+      else {
+        const answers = await inquirer.prompt({
+          type: "list",
+          name: "command",
+          message: "Tienes que hacer login antes!",
+          choices: Object.values(Commands2)
+        });
+        switch (answers["command"]) {
+          case Commands2.Back:
+            promptUser();
+            break;
+        }
+      }
+    }
+};
 
 async function promptUser(): Promise<void> {
   console.clear();
@@ -282,10 +385,6 @@ async function promptUser(): Promise<void> {
     choices: Object.values(Commands)
   });
   switch (answers["command"]) {
-    case Commands.Toggle:
-      showCompleted = !showCompleted;
-      promptUser();
-      break;
     case Commands.KeySee:
       keySee();
       break;
@@ -300,17 +399,6 @@ async function promptUser(): Promise<void> {
       break;
     case Commands.Vote:
       pickVote();
-      break;
-    case Commands.Complete:
-      if (collection.getTaskCounts().incomplete > 0) {
-        promptComplete();
-      } else {
-        promptUser();
-      }
-      break;
-    case Commands.Purge:
-      collection.removeComplete();
-      promptUser();
       break;
   }
 }
